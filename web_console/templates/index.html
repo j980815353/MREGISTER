@@ -564,7 +564,8 @@
             <pre class="doc-pre">python -m pip install -r web_console/requirements.txt
 uvicorn web_console.app:app --host 0.0.0.0 --port 8000</pre>
             <h4>{{ t.docs_compose_deploy_title }}</h4>
-            <pre class="doc-pre">docker compose up -d --build</pre>
+            <pre class="doc-pre">docker compose pull
+docker compose up -d</pre>
           </div>
           <div class="doc-block">
             <h3>{{ t.docs_api_flow_title }}</h3>

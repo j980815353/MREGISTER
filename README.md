@@ -83,33 +83,43 @@ http://服务器IP:8000
 
 ## Docker Compose 部署
 
-当前仓库已经带好了 `docker-compose.yml`，可直接使用。
+当前仓库已经带好了 `docker-compose.yml`，默认直接拉取 Docker Hub 镜像：
 
-### 1. 启动
-
-```bash
-docker compose up -d --build
+```text
+maishanhub/mregister:main
 ```
 
-### 2. 查看状态
+### 1. 拉取镜像
+
+```bash
+docker compose pull
+```
+
+### 2. 启动服务
+
+```bash
+docker compose up -d
+```
+
+### 3. 查看状态
 
 ```bash
 docker compose ps
 ```
 
-### 3. 查看日志
+### 4. 查看日志
 
 ```bash
 docker compose logs -f
 ```
 
-### 4. 访问控制台
+### 5. 访问控制台
 
 ```text
 http://服务器IP:8000
 ```
 
-### 5. 停止服务
+### 6. 停止服务
 
 ```bash
 docker compose down
@@ -117,8 +127,8 @@ docker compose down
 
 说明：
 
-- 镜像构建上下文是当前项目根目录 `.`
-- Dockerfile 路径是 `web_console/Dockerfile`
+- `docker-compose.yml` 现在默认从 Docker Hub 拉取 `maishanhub/mregister:main`
+- 不再依赖本地执行 Docker build
 - 容器默认监听 `8000` 端口
 
 ## 持久化与目录说明
