@@ -113,6 +113,7 @@ button, input, select, textarea { font: inherit; }
 
 .sidebar-top {
   gap: 12px;
+  justify-content: flex-start;
 }
 
 .sidebar-brand {
@@ -186,7 +187,7 @@ button, input, select, textarea { font: inherit; }
 .sidebar-nav { gap: 8px; align-content: start; }
 .sidebar-footer { padding-top: 10px; border-top: 1px solid rgba(200, 187, 159, 0.45); }
 
-.nav-btn, .sidebar-logout {
+.nav-btn, .sidebar-logout, .sidebar-footer-toggle {
   width: 100%;
   min-height: 46px;
   border-radius: 16px;
@@ -205,6 +206,11 @@ button, input, select, textarea { font: inherit; }
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
+}
+
+.sidebar-footer-toggle {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(18, 108, 82, 0.14);
 }
 
 .nav-btn__icon {
@@ -243,13 +249,15 @@ button, input, select, textarea { font: inherit; }
 }
 
 .nav-btn.active .nav-btn__icon,
-.sidebar-logout:hover:not(:disabled) .nav-btn__icon {
+.sidebar-logout:hover:not(:disabled) .nav-btn__icon,
+.sidebar-footer-toggle:hover:not(:disabled) .nav-btn__icon {
   background: rgba(255, 255, 255, 0.16);
   color: inherit;
 }
 
 .nav-btn:hover:not(:disabled) .nav-btn__icon,
-.sidebar-logout:hover:not(:disabled) .nav-btn__icon {
+.sidebar-logout:hover:not(:disabled) .nav-btn__icon,
+.sidebar-footer-toggle:hover:not(:disabled) .nav-btn__icon {
   transform: translateX(1px);
 }
 
@@ -259,14 +267,16 @@ button, input, select, textarea { font: inherit; }
   transform: translateX(-8px);
 }
 
-.admin-shell.sidebar-collapsed .sidebar-toggle span {
-  transform: rotate(180deg);
-}
-
 .admin-shell.sidebar-collapsed .nav-btn__label {
   max-width: 0;
   opacity: 0;
   transform: translateX(-8px);
+}
+
+.sidebar-toggle-glyph {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .content-shell { min-width: 0; padding: 22px; }

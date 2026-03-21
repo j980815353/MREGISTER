@@ -1555,15 +1555,6 @@ Authorization: Bearer YOUR_API_KEY`,
                 <h1>{tr('brand_name')}</h1>
               </div>
             </div>
-            <button type="button" className="sidebar-toggle" aria-label={tr('toggle_sidebar')} onClick={() => {
-              if (isMobileLayout()) {
-                setSidebarOpen(true);
-              } else {
-                setSidebarCollapsed((current) => !current);
-              }
-            }}>
-              <span>{sidebarCollapsed && !isMobileLayout() ? '>' : '<'}</span>
-            </button>
           </div>
           <nav className="sidebar-nav">
             {NAV_ITEMS.map(([sectionId, labelKey]) => {
@@ -1582,11 +1573,27 @@ Authorization: Bearer YOUR_API_KEY`,
               );
             })}
           </nav>
+          <BusyButton type="button" className="sidebar-logout" busy={isBusy('logout')} onClick={handleLogout} title={logoutLabel}>
+            <span className="nav-btn__icon" aria-hidden="true"><SidebarIcon name="logout" /></span>
+            <span className="nav-btn__label">{logoutLabel}</span>
+          </BusyButton>
           <div className="sidebar-footer">
-            <BusyButton type="button" className="sidebar-logout" busy={isBusy('logout')} onClick={handleLogout} title={logoutLabel}>
-              <span className="nav-btn__icon" aria-hidden="true"><SidebarIcon name="logout" /></span>
-              <span className="nav-btn__label">{logoutLabel}</span>
-            </BusyButton>
+            <button
+              type="button"
+              className="sidebar-footer-toggle"
+              aria-label={tr('toggle_sidebar')}
+              title={tr('toggle_sidebar')}
+              onClick={() => {
+                if (isMobileLayout()) {
+                  setSidebarOpen((current) => !current);
+                } else {
+                  setSidebarCollapsed((current) => !current);
+                }
+              }}
+            >
+              <span className="nav-btn__icon sidebar-toggle-glyph" aria-hidden="true">{sidebarCollapsed && !isMobileLayout() ? '>' : '<'}</span>
+              <span className="nav-btn__label">{tr('toggle_sidebar')}</span>
+            </button>
           </div>
         </aside>
         <button type="button" className="sidebar-overlay" aria-label={tr('close_sidebar')} onClick={() => setSidebarOpen(false)} />
