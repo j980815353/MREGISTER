@@ -206,6 +206,16 @@ button, input, select, textarea { font: inherit; }
     transform 0.18s ease;
 }
 
+.nav-btn:hover:not(:disabled),
+.sidebar-logout:hover:not(:disabled),
+.sidebar-footer-toggle:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink);
+  border-color: rgba(200, 187, 159, 0.42);
+  box-shadow: none;
+  transform: none;
+}
+
 .sidebar-footer-toggle {
   background: rgba(255, 255, 255, 0.62);
   border-color: rgba(18, 108, 82, 0.14);
@@ -265,10 +275,32 @@ button, input, select, textarea { font: inherit; }
   transform: translateX(-8px);
 }
 
+.admin-shell.sidebar-collapsed .sidebar-top,
+.admin-shell.sidebar-collapsed .sidebar-brand,
+.admin-shell.sidebar-collapsed .sidebar-footer {
+  justify-content: center;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-brand {
+  width: 100%;
+}
+
+.admin-shell.sidebar-collapsed .brand-logo-wrap {
+  margin: 0 auto;
+}
+
 .admin-shell.sidebar-collapsed .nav-btn__label {
   max-width: 0;
   opacity: 0;
   transform: translateX(-8px);
+}
+
+.admin-shell.sidebar-collapsed .nav-btn,
+.admin-shell.sidebar-collapsed .sidebar-logout,
+.admin-shell.sidebar-collapsed .sidebar-footer-toggle {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .sidebar-toggle-glyph {

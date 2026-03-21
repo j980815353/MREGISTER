@@ -603,19 +603,24 @@ def run(proxy: Optional[str]) -> Optional[tuple[str, str, str]]:
                 return None
         else:
             print("[Info] Cookie 不携带 workspace，直接走 consent 路径")
-            # 直接构造 consent URL
-            continue_url = f"https://auth.openai.com/sign-in-with-chatgpt/codex/consent?client_id={CLIENT_ID}&redirect_uri={urllib.parse.quote(oauth.redirect_uri, safe='')}&response_type=code&scope={urllib.parse.quote(DEFAULT_SCOPE, safe='')}&state={oauth.state}&code_challenge={_sha256_b64url_no_pad(oauth.code_verifier)}&code_challenge_method=S256"
+            # 直接跳转到 OAuth authorize 接口，让服务器处理
+            continue_url = f"https://auth.openai.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={urllib.parse.quote(oauth.redirect_uri, safe='')}&scope={urllib.parse.quote(DEFAULT_SCOPE, safe='')}&state={oauth.state}&code_challenge={_sha256_b64url_no_pad(oauth.code_verifier)}&code_challenge_method=S256&prompt=none"
 
         current_url = continue_url
-        for _ in range(6):
+        print(f"[*] 开始跟随重定向链: {current_url[:200]}")
+        for i in range(6):
             final_resp = s.get(current_url, allow_redirects=False, timeout=15)
             location = final_resp.headers.get("Location") or ""
+            print(f"[*] 重定向步骤 {i+1}: 状态={final_resp.status_code}, 位置={location[:200] if location else '无'}")
             if final_resp.status_code not in [301, 302, 303, 307, 308]:
+                print(f"[*] 非重定向状态码，停止跟随")
                 break
             if not location:
+                print(f"[*] 无 Location 头，停止跟随")
                 break
             next_url = urllib.parse.urljoin(current_url, location)
             if "code=" in next_url and "state=" in next_url:
+                print(f"[*] 找到 OAuth callback URL")
                 token_json = submit_callback_url(
                     callback_url=next_url,
                     code_verifier=oauth.code_verifier,
@@ -626,6 +631,7 @@ def run(proxy: Optional[str]) -> Optional[tuple[str, str, str]]:
             current_url = next_url
 
         print("[Error] 未能在重定向链中捕获到最终 Callback URL")
+        print(f"[*] 最终URL: {current_url[:200]}")
         return None
 
     except Exception as e:
