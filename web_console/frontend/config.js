@@ -62,7 +62,7 @@ export function getPlatformKeys(platforms) {
 
 export function initialTaskDraft(platforms) {
   const keys = getPlatformKeys(platforms);
-  const platform = keys[0] || 'openai-register';
+  const platform = keys[0] || 'chatgpt-register-v2';
   return {
     name: '',
     platform,
@@ -77,7 +77,7 @@ export function initialTaskDraft(platforms) {
 
 export function normalizeTaskDraft(draft, platforms, credentials, proxies) {
   const keys = getPlatformKeys(platforms);
-  const platform = platforms[draft.platform] ? draft.platform : (keys[0] || 'openai-register');
+  const platform = platforms[draft.platform] ? draft.platform : (keys[0] || 'chatgpt-register-v2');
   const spec = platforms[platform] || {};
   const mailIds = new Set(credentials.filter((item) => item.kind === 'gptmail').map((item) => String(item.id)));
   const captchaIds = new Set(credentials.filter((item) => item.kind === 'yescaptcha').map((item) => String(item.id)));

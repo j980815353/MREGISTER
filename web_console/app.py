@@ -36,14 +36,6 @@ MAX_CONCURRENT_TASKS = max(1, int(os.getenv("WEB_CONSOLE_MAX_CONCURRENT_TASKS", 
 POLL_INTERVAL_SECONDS = max(1.0, float(os.getenv("WEB_CONSOLE_POLL_INTERVAL", "2.0")))
 
 PLATFORMS = {
-    "openai-register": {
-        "label": "OpenAI Register",
-        "requires_email_credential": True,
-        "requires_captcha_credential": False,
-        "supports_proxy": True,
-        "default_concurrency": 1,
-        "notes": "Uses GPTMail and writes token/account files into the task directory.",
-    },
     "chatgpt-register-v2": {
         "label": "ChatGPT Register v2",
         "requires_email_credential": True,
@@ -182,7 +174,7 @@ UI_TRANSLATIONS = {
         "endpoint_download_desc": "下载任务结果压缩包",
         "required_yes": "是",
         "required_no": "否",
-        "param_platform_desc": "驱动名称，目前支持 `openai-register`、`chatgpt-register-v2` 和 `grok-register`",
+        "param_platform_desc": "驱动名称，目前支持 `chatgpt-register-v2` 和 `grok-register`",
         "param_quantity_desc": "目标成功数量，系统按真实成功数判断完成，不按尝试次数计算",
         "param_use_proxy_desc": "是否启用默认代理，不传或传 false 表示不使用代理",
         "param_concurrency_desc": "并发数，默认 1",
@@ -366,7 +358,7 @@ UI_TRANSLATIONS = {
         "endpoint_download_desc": "下载任务结果压缩包",
         "required_yes": "Yes",
         "required_no": "No",
-        "param_platform_desc": "Driver name. Supported values: `openai-register`, `chatgpt-register-v2`, and `grok-register`",
+        "param_platform_desc": "Driver name. Supported values: `chatgpt-register-v2` and `grok-register`",
         "param_quantity_desc": "目标成功数量，系统按真实成功数判断完成，不按尝试次数计算",
         "param_use_proxy_desc": "是否启用默认代理，不传或传 false 表示不使用代理",
         "param_concurrency_desc": "并发数，默认 1",

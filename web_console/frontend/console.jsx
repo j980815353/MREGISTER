@@ -18,6 +18,16 @@ import { BusyButton, Modal } from './ui.jsx';
 
 const SIDEBAR_LOGO_SRC = '/static/MAISHANhlogomini.png';
 const PROJECT_GITHUB_URL = 'https://github.com/Maishan-Inc/MREGISTER';
+const SECTION_TITLE_KEYS = {
+  dashboard: 'section_overview',
+  credentials: 'section_credentials',
+  proxies: 'section_proxies',
+  'create-task': 'section_tasks',
+  'task-detail': 'section_task_detail',
+  schedules: 'section_schedules',
+  'api-keys': 'section_api',
+  docs: 'section_docs',
+};
 
 function normalizeStatePayload(payload) {
   return {
@@ -164,7 +174,7 @@ function getDocsContent(uiLang, apiBaseUrl) {
       paramsTitle: '创建任务参数',
       paramHeaders: ['字段', '类型', '必填', '说明'],
       params: [
-        ['platform', 'string', '是', '支持 `openai-register`、`chatgpt-register-v2` 与 `grok-register`'],
+        ['platform', 'string', '是', '支持 `chatgpt-register-v2` 与 `grok-register`'],
         ['quantity', 'integer', '是', '目标成功数量，按真实成功数统计'],
         ['use_proxy', 'boolean', '否', '是否使用后台默认代理'],
         ['concurrency', 'integer', '否', '并发数，默认 1'],
@@ -183,7 +193,7 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {
-  "platform": "openai-register",
+  "platform": "chatgpt-register-v2",
   "quantity": 10,
   "use_proxy": true,
   "concurrency": 1
@@ -191,7 +201,7 @@ Content-Type: application/json
       createExampleCurl: `curl -X POST "${apiBaseUrl}/api/external/tasks" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"platform\\":\\"openai-register\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1}"`,
+  -d "{\\"platform\\":\\"chatgpt-register-v2\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1}"`,
       queryExampleTitle: '查询任务示例',
       queryExampleHttp: `GET ${apiBaseUrl}/api/external/tasks/TASK_ID
 Authorization: Bearer YOUR_API_KEY`,
@@ -258,7 +268,7 @@ Authorization: Bearer YOUR_API_KEY`,
     paramsTitle: 'Create Task Parameters',
     paramHeaders: ['Field', 'Type', 'Required', 'Description'],
     params: [
-      ['platform', 'string', 'yes', 'Supports `openai-register`, `chatgpt-register-v2`, and `grok-register`'],
+      ['platform', 'string', 'yes', 'Supports `chatgpt-register-v2` and `grok-register`'],
       ['quantity', 'integer', 'yes', 'Target success count'],
       ['use_proxy', 'boolean', 'no', 'Whether to use the configured default proxy'],
       ['concurrency', 'integer', 'no', 'Concurrency, default is 1'],
@@ -277,7 +287,7 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {
-  "platform": "openai-register",
+  "platform": "chatgpt-register-v2",
   "quantity": 10,
   "use_proxy": true,
   "concurrency": 1
@@ -285,7 +295,7 @@ Content-Type: application/json
     createExampleCurl: `curl -X POST "${apiBaseUrl}/api/external/tasks" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"platform\\":\\"openai-register\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1}"`,
+  -d "{\\"platform\\":\\"chatgpt-register-v2\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1}"`,
     queryExampleTitle: 'Query Task Example',
     queryExampleHttp: `GET ${apiBaseUrl}/api/external/tasks/TASK_ID
 Authorization: Bearer YOUR_API_KEY`,
@@ -341,7 +351,7 @@ export function ConsoleApp() {
   const [taskDraft, setTaskDraft] = useState(initialTaskDraft(APP_CONFIG.platforms || {}));
   const [scheduleDraft, setScheduleDraft] = useState({
     name: '',
-    platform: getPlatformKeys(APP_CONFIG.platforms || {})[0] || 'openai-register',
+    platform: getPlatformKeys(APP_CONFIG.platforms || {})[0] || 'chatgpt-register-v2',
     quantity: '1',
     concurrency: '1',
     time_of_day: '',
@@ -358,7 +368,12 @@ export function ConsoleApp() {
     : statePayload.tasks.filter((task) => task.status === taskFilterStatus);
   const visibleTask = filteredTasks.find((item) => item.id === selectedTaskId) || filteredTasks[0] || null;
   const currentPlatformSpec = statePayload.platforms[taskDraft.platform] || {};
-  const currentSectionLabel = tr(NAV_ITEMS.find(([sectionId]) => sectionId === activeSection)?.[1] || 'nav_dashboard');
+  const currentSectionLabel = tr(SECTION_TITLE_KEYS[activeSection] || 'section_overview');
+  const topbarBreadcrumbs = [
+    tr('topbar_workspace'),
+    ...(activeSection === 'dashboard' ? [] : [currentSectionLabel]),
+    ...(activeSection === 'task-detail' && visibleTask ? [getTaskDisplayName(visibleTask)] : []),
+  ];
   const logoutLabel = tr('nav_logout');
 
   useEffect(() => {
@@ -413,7 +428,7 @@ export function ConsoleApp() {
     });
     setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies));
     setScheduleDraft((current) => {
-      const platform = payload.platforms[current.platform] ? current.platform : (getPlatformKeys(payload.platforms)[0] || 'openai-register');
+      const platform = payload.platforms[current.platform] ? current.platform : (getPlatformKeys(payload.platforms)[0] || 'chatgpt-register-v2');
       return { ...current, platform };
     });
     setSelectedTaskId((current) => {
@@ -571,7 +586,7 @@ export function ConsoleApp() {
       });
       setScheduleDraft({
         name: '',
-        platform: getPlatformKeys(statePayload.platforms)[0] || 'openai-register',
+        platform: getPlatformKeys(statePayload.platforms)[0] || 'chatgpt-register-v2',
         quantity: '1',
         concurrency: '1',
         time_of_day: '',
@@ -710,12 +725,6 @@ export function ConsoleApp() {
     const metrics = statePayload.dashboard || {};
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_dashboard')}</p>
-            <h2>{tr('section_overview')}</h2>
-          </div>
-        </div>
         <div className="metric-grid">
           <article className="metric-card"><strong>{metrics.running_tasks || 0}</strong><span>{tr('dashboard_running_tasks')}</span></article>
           <article className="metric-card"><strong>{metrics.completed_tasks || 0}</strong><span>{tr('dashboard_completed_tasks')}</span></article>
@@ -787,12 +796,6 @@ export function ConsoleApp() {
   function renderCredentials() {
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_credentials')}</p>
-            <h2>{tr('section_credentials')}</h2>
-          </div>
-        </div>
         <div className="grid-two">
           <article className="panel">
             <div className="panel-head">
@@ -892,12 +895,6 @@ export function ConsoleApp() {
   function renderProxies() {
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_proxies')}</p>
-            <h2>{tr('section_proxies')}</h2>
-          </div>
-        </div>
         <div className="grid-two">
           <article className="panel">
             <div className="panel-head">
@@ -958,12 +955,6 @@ export function ConsoleApp() {
   function renderCreateTask() {
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_create_task')}</p>
-            <h2>{tr('section_tasks')}</h2>
-          </div>
-        </div>
         <article className="panel">
           <form className="grid-two form-grid" onSubmit={handleTaskSubmit}>
             <label className="field-card">
@@ -1046,13 +1037,7 @@ export function ConsoleApp() {
   function renderTaskDetail() {
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_task_detail')}</p>
-            <h2>{tr('section_task_detail')}</h2>
-            <p className="subtle task-detail-note">{tr('task_detail_note')}</p>
-          </div>
-        </div>
+        <p className="subtle task-detail-note content-section-note">{tr('task_detail_note')}</p>
         <div className="detail-layout">
           <aside className="task-side-wrap">
             <article className="panel task-side-panel">
@@ -1127,12 +1112,6 @@ export function ConsoleApp() {
   function renderSchedules() {
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_schedules')}</p>
-            <h2>{tr('section_schedules')}</h2>
-          </div>
-        </div>
         <div className="grid-two">
           <article className="panel">
             <div className="panel-head">
@@ -1208,12 +1187,6 @@ export function ConsoleApp() {
     const apiKeys = statePayload.apiKeys || [];
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_api_keys')}</p>
-            <h2>{tr('section_api')}</h2>
-          </div>
-        </div>
         <div className="grid-two">
           <article className="panel">
             <div className="panel-head">
@@ -1287,7 +1260,7 @@ export function ConsoleApp() {
       paramsTitle: '创建任务参数',
       paramHeaders: ['字段', '类型', '必填', '说明'],
       params: [
-        ['platform', 'string', '是', '支持 `openai-register`、`chatgpt-register-v2` 与 `grok-register`'],
+        ['platform', 'string', '是', '支持 `chatgpt-register-v2` 与 `grok-register`'],
         ['quantity', 'integer', '是', '目标成功数量，按真实成功数统计'],
         ['use_proxy', 'boolean', '否', '是否使用后台默认代理'],
         ['concurrency', 'integer', '否', '并发数，默认 `1`'],
@@ -1306,16 +1279,16 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {
-  "platform": "openai-register",
+  "platform": "chatgpt-register-v2",
   "quantity": 10,
   "use_proxy": true,
   "concurrency": 1,
-  "name": "openai-batch-01"
+  "name": "chatgpt-batch-01"
 }`,
       createCurl: `curl -X POST "${apiBaseUrl}/api/external/tasks" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"platform\\":\\"openai-register\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1,\\"name\\":\\"openai-batch-01\\"}"`,
+  -d "{\\"platform\\":\\"chatgpt-register-v2\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1,\\"name\\":\\"chatgpt-batch-01\\"}"`,
       queryTitle: '查询任务示例',
       queryHttp: `GET ${apiBaseUrl}/api/external/tasks/TASK_ID
 Authorization: Bearer YOUR_API_KEY`,
@@ -1356,7 +1329,7 @@ Authorization: Bearer YOUR_API_KEY`,
       paramsTitle: 'Create Task Parameters',
       paramHeaders: ['Field', 'Type', 'Required', 'Description'],
       params: [
-        ['platform', 'string', 'yes', 'Supports `openai-register`, `chatgpt-register-v2`, and `grok-register`'],
+        ['platform', 'string', 'yes', 'Supports `chatgpt-register-v2` and `grok-register`'],
         ['quantity', 'integer', 'yes', 'Target success count'],
         ['use_proxy', 'boolean', 'no', 'Whether to use the configured default proxy'],
         ['concurrency', 'integer', 'no', 'Concurrency, default is `1`'],
@@ -1375,16 +1348,16 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {
-  "platform": "openai-register",
+  "platform": "chatgpt-register-v2",
   "quantity": 10,
   "use_proxy": true,
   "concurrency": 1,
-  "name": "openai-batch-01"
+  "name": "chatgpt-batch-01"
 }`,
       createCurl: `curl -X POST "${apiBaseUrl}/api/external/tasks" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"platform\\":\\"openai-register\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1,\\"name\\":\\"openai-batch-01\\"}"`,
+  -d "{\\"platform\\":\\"chatgpt-register-v2\\",\\"quantity\\":10,\\"use_proxy\\":true,\\"concurrency\\":1,\\"name\\":\\"chatgpt-batch-01\\"}"`,
       queryTitle: 'Query Task Example',
       queryHttp: `GET ${apiBaseUrl}/api/external/tasks/TASK_ID
 Authorization: Bearer YOUR_API_KEY`,
@@ -1408,12 +1381,6 @@ Authorization: Bearer YOUR_API_KEY`,
 
     return (
       <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_docs')}</p>
-            <h2>{tr('section_docs')}</h2>
-          </div>
-        </div>
         <article className="panel docs-panel">
           <section className="docs-hero">
             <h3>{docs.heroTitle}</h3>
@@ -1619,8 +1586,14 @@ Authorization: Bearer YOUR_API_KEY`,
               </span>
             </button>
             <div className="content-topbar-copy">
-              <p className="eyebrow">{tr('topbar_workspace')}</p>
-              <strong>{currentSectionLabel}</strong>
+              {topbarBreadcrumbs.map((item, index) => (
+                <React.Fragment key={`${item}-${index}`}>
+                  {index ? <span className="content-breadcrumb-sep" aria-hidden="true">&gt;</span> : null}
+                  <span className={`content-breadcrumb ${index === topbarBreadcrumbs.length - 1 ? 'content-breadcrumb--current' : ''}`.trim()}>
+                    {item}
+                  </span>
+                </React.Fragment>
+              ))}
             </div>
             <a
               className="topbar-link"
