@@ -17,7 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlsplit, urlunsplit
 
+import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -141,6 +143,23 @@ UI_TRANSLATIONS = {
         "field_time_of_day": "执行时间",
         "field_use_default_proxy": "使用默认代理",
         "save_schedule": "保存定时任务",
+        "cpamc_title": "配置 CPAMC",
+        "cpamc_desc": "用于绑定 CLI Proxy API Management Center，仅处理 Codex / Grok 相关 JSON 导入。",
+        "field_cpamc_enabled": "启用 CLI Proxy API Management Center",
+        "field_cpamc_base_url": "域名/IP 链接",
+        "field_cpamc_base_url_placeholder": "例如 http://127.0.0.1:8317 或 http://127.0.0.1:8317/v0/management",
+        "field_cpamc_management_key": "管理密钥",
+        "field_cpamc_management_key_placeholder": "输入 CPAMC Management Key",
+        "save_cpamc": "保存 CPAMC 配置",
+        "test_cpamc": "测试链接",
+        "cpamc_status_linked": "已链接",
+        "cpamc_status_unlinked": "未链接",
+        "cpamc_status_disabled": "未启用",
+        "cpamc_last_error": "最近错误：{value}",
+        "cpamc_import_button": "导入到 CPAMC",
+        "cpamc_import_disabled": "当前任务没有可导入的 JSON 文件",
+        "cpamc_import_success": "已导入 {count} 个 JSON 文件到 CPAMC。",
+        "cpamc_import_partial": "已导入 {success} 个，失败 {failed} 个。",
         "section_api": "API 接口",
         "api_create_title": "创建 API Key",
         "api_create_desc": "新建成功后只会显示一次，请立即保存。",
@@ -325,6 +344,23 @@ UI_TRANSLATIONS = {
         "field_time_of_day": "Run time",
         "field_use_default_proxy": "Use default proxy",
         "save_schedule": "Save schedule",
+        "cpamc_title": "Configure CPAMC",
+        "cpamc_desc": "Bind CLI Proxy API Management Center here. This is only used for Codex / Grok related JSON imports.",
+        "field_cpamc_enabled": "Enable CLI Proxy API Management Center",
+        "field_cpamc_base_url": "Domain/IP link",
+        "field_cpamc_base_url_placeholder": "For example http://127.0.0.1:8317 or http://127.0.0.1:8317/v0/management",
+        "field_cpamc_management_key": "Management key",
+        "field_cpamc_management_key_placeholder": "Enter the CPAMC management key",
+        "save_cpamc": "Save CPAMC settings",
+        "test_cpamc": "Test link",
+        "cpamc_status_linked": "Linked",
+        "cpamc_status_unlinked": "Not linked",
+        "cpamc_status_disabled": "Disabled",
+        "cpamc_last_error": "Last error: {value}",
+        "cpamc_import_button": "Import to CPAMC",
+        "cpamc_import_disabled": "This task has no importable JSON files",
+        "cpamc_import_success": "Imported {count} JSON file(s) to CPAMC.",
+        "cpamc_import_partial": "Imported {success}, failed {failed}.",
         "section_api": "API 接口",
         "api_create_title": "Create API key",
         "api_create_desc": "A new key is only shown once. Save it immediately.",
@@ -429,6 +465,14 @@ DEFAULT_SETTING_KEYS = {
     "default_gptmail_credential_id": None,
     "default_yescaptcha_credential_id": None,
     "default_proxy_id": None,
+}
+
+CPAMC_SETTING_KEYS = {
+    "cpamc_enabled": "0",
+    "cpamc_base_url": "",
+    "cpamc_management_key": "",
+    "cpamc_linked": "0",
+    "cpamc_last_error": "",
 }
 
 db_lock = threading.RLock()
@@ -653,6 +697,117 @@ def get_defaults() -> dict[str, int | None]:
     return result
 
 
+def normalize_cpamc_base_url(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if not raw.startswith(("http://", "https://")):
+        raw = f"http://{raw}"
+    parsed = urlsplit(raw)
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="CPAMC link is invalid")
+    path = (parsed.path or "").rstrip("/")
+    if not path:
+        path = "/v0/management"
+    elif not path.endswith("/v0/management"):
+        path = f"{path}/v0/management"
+    return urlunsplit((parsed.scheme or "http", parsed.netloc, path, "", ""))
+
+
+def get_cpamc_settings() -> dict[str, Any]:
+    enabled = get_setting("cpamc_enabled") == "1"
+    base_url = (get_setting("cpamc_base_url") or "").strip()
+    management_key = (get_setting("cpamc_management_key") or "").strip()
+    linked = get_setting("cpamc_linked") == "1"
+    last_error = (get_setting("cpamc_last_error") or "").strip()
+    return {
+        "enabled": enabled,
+        "base_url": base_url,
+        "management_key": management_key,
+        "linked": linked,
+        "last_error": last_error,
+    }
+
+
+def set_cpamc_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    set_setting("cpamc_enabled", "1" if settings.get("enabled") else "0")
+    set_setting("cpamc_base_url", str(settings.get("base_url") or "").strip())
+    set_setting("cpamc_management_key", str(settings.get("management_key") or "").strip())
+    set_setting("cpamc_linked", "1" if settings.get("linked") else "0")
+    set_setting("cpamc_last_error", str(settings.get("last_error") or "").strip())
+    return get_cpamc_settings()
+
+
+def cpamc_headers(management_key: str, extra: dict[str, str] | None = None) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {management_key}",
+        "X-Management-Key": management_key,
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
+
+def cpamc_request(
+    method: str,
+    *,
+    base_url: str,
+    management_key: str,
+    path: str,
+    **kwargs: Any,
+) -> requests.Response:
+    target = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    headers = kwargs.pop("headers", {})
+    return requests.request(
+        method=method,
+        url=target,
+        headers=cpamc_headers(management_key, headers),
+        timeout=20,
+        **kwargs,
+    )
+
+
+def parse_cpamc_error(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+    except Exception:
+        payload = None
+    if isinstance(payload, dict):
+        detail = payload.get("message") or payload.get("error") or payload.get("detail")
+        if detail:
+            return str(detail)
+    text = (response.text or "").strip()
+    if text:
+        return text[:240]
+    return f"HTTP {response.status_code}"
+
+
+def cpamc_import_candidates(task: sqlite3.Row | dict[str, Any], *, validate: bool) -> list[Path]:
+    task_dir = Path(task["task_dir"])
+    candidate_dirs = [
+        task_dir / "output" / "tokens",
+        task_dir / "keys",
+    ]
+    files: list[Path] = []
+    for directory in candidate_dirs:
+        if not directory.exists():
+            continue
+        for file_path in sorted(directory.glob("*.json")):
+            if not validate:
+                files.append(file_path)
+                continue
+            try:
+                payload = json.loads(file_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            token_type = str(payload.get("type") or "").strip().lower()
+            if token_type in {"codex", "grok"} or ("access_token" in payload and "refresh_token" in payload):
+                files.append(file_path)
+    return files
+
+
 def hash_password(password: str, salt_hex: str | None = None) -> str:
     salt = bytes.fromhex(salt_hex) if salt_hex else secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
@@ -866,6 +1021,7 @@ def serialize_task(row: sqlite3.Row) -> dict[str, Any]:
     item = row_to_dict(row)
     item["results_count"] = count_result_lines(row)
     item["console_tail"] = read_tail(Path(item["console_path"]))
+    item["cpamc_importable_count"] = len(cpamc_import_candidates(row, validate=False))
     try:
         item["requested_config"] = json.loads(item["requested_config_json"])
     except Exception:
@@ -945,6 +1101,12 @@ class DefaultSettingsPayload(BaseModel):
     default_gptmail_credential_id: int | None = None
     default_yescaptcha_credential_id: int | None = None
     default_proxy_id: int | None = None
+
+
+class CpamcSettingsPayload(BaseModel):
+    enabled: bool = False
+    base_url: str | None = None
+    management_key: str | None = None
 
 
 class ApiKeyCreate(BaseModel):
@@ -1404,6 +1566,7 @@ def state_payload() -> dict[str, Any]:
     return {
         "platforms": PLATFORMS,
         "defaults": get_defaults(),
+        "cpamc": get_cpamc_settings(),
         "credentials": get_credentials(),
         "proxies": get_proxies(),
         "tasks": get_tasks(),
@@ -1519,6 +1682,80 @@ async def update_defaults(payload: DefaultSettingsPayload, request: Request) -> 
     set_setting("default_yescaptcha_credential_id", str(payload.default_yescaptcha_credential_id) if payload.default_yescaptcha_credential_id else None)
     set_setting("default_proxy_id", str(payload.default_proxy_id) if payload.default_proxy_id else None)
     return JSONResponse({"ok": True, "defaults": get_defaults()})
+
+
+@app.post("/api/cpamc")
+async def update_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    previous = get_cpamc_settings()
+    base_url = normalize_cpamc_base_url(payload.base_url)
+    management_key = (payload.management_key or "").strip()
+    if payload.enabled and not base_url:
+        raise HTTPException(status_code=400, detail="CPAMC link is required when enabled")
+    if payload.enabled and not management_key:
+        raise HTTPException(status_code=400, detail="CPAMC management key is required when enabled")
+    linked = previous["linked"] and previous["base_url"] == base_url and previous["management_key"] == management_key
+    saved = set_cpamc_settings(
+        {
+            "enabled": payload.enabled,
+            "base_url": base_url,
+            "management_key": management_key,
+            "linked": linked,
+            "last_error": previous["last_error"] if linked else "",
+        }
+    )
+    return JSONResponse({"ok": True, "cpamc": saved})
+
+
+@app.post("/api/cpamc/test")
+async def test_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    base_url = normalize_cpamc_base_url(payload.base_url)
+    management_key = (payload.management_key or "").strip()
+    if not base_url:
+        raise HTTPException(status_code=400, detail="CPAMC link is required")
+    if not management_key:
+        raise HTTPException(status_code=400, detail="CPAMC management key is required")
+    try:
+        response = cpamc_request(
+            "GET",
+            base_url=base_url,
+            management_key=management_key,
+            path="config",
+        )
+    except requests.RequestException as exc:
+        set_cpamc_settings(
+            {
+                "enabled": payload.enabled,
+                "base_url": base_url,
+                "management_key": management_key,
+                "linked": False,
+                "last_error": str(exc),
+            }
+        )
+        raise HTTPException(status_code=502, detail=f"CPAMC connection failed: {exc}") from exc
+    if not response.ok:
+        message = parse_cpamc_error(response)
+        set_cpamc_settings(
+            {
+                "enabled": payload.enabled,
+                "base_url": base_url,
+                "management_key": management_key,
+                "linked": False,
+                "last_error": message,
+            }
+        )
+        raise HTTPException(status_code=502, detail=f"CPAMC test failed: {message}")
+    saved = set_cpamc_settings(
+        {
+            "enabled": payload.enabled,
+            "base_url": base_url,
+            "management_key": management_key,
+            "linked": True,
+            "last_error": "",
+        }
+    )
+    return JSONResponse({"ok": True, "linked": True, "cpamc": saved})
 
 
 @app.post("/api/credentials")
@@ -1638,6 +1875,61 @@ async def stop_task(task_id: int, request: Request) -> JSONResponse:
     require_authenticated(request)
     supervisor.stop_task(task_id)
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/tasks/{task_id}/cpamc-import")
+async def import_task_to_cpamc(task_id: int, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    cpamc = get_cpamc_settings()
+    if not cpamc["enabled"]:
+        raise HTTPException(status_code=400, detail="CPAMC is not enabled")
+    if not cpamc["linked"]:
+        raise HTTPException(status_code=400, detail="CPAMC is not linked yet")
+    if not cpamc["base_url"] or not cpamc["management_key"]:
+        raise HTTPException(status_code=400, detail="CPAMC configuration is incomplete")
+
+    task = get_task(task_id)
+    candidates = cpamc_import_candidates(task, validate=True)
+    if not candidates:
+        raise HTTPException(status_code=400, detail="No importable JSON files were found for this task")
+
+    imported: list[str] = []
+    failed: list[dict[str, str]] = []
+    for file_path in candidates:
+        try:
+            payload_bytes = file_path.read_bytes()
+        except Exception as exc:
+            failed.append({"name": file_path.name, "error": str(exc)})
+            continue
+        try:
+            response = cpamc_request(
+                "POST",
+                base_url=str(cpamc["base_url"]),
+                management_key=str(cpamc["management_key"]),
+                path=f"auth-files?name={quote(file_path.name)}",
+                data=payload_bytes,
+                headers={"Content-Type": "application/json"},
+            )
+        except requests.RequestException as exc:
+            failed.append({"name": file_path.name, "error": str(exc)})
+            continue
+        if response.ok:
+            imported.append(file_path.name)
+        else:
+            failed.append({"name": file_path.name, "error": parse_cpamc_error(response)})
+
+    if not imported:
+        first_error = failed[0]["error"] if failed else "Unknown import error"
+        raise HTTPException(status_code=502, detail=f"CPAMC import failed: {first_error}")
+    return JSONResponse(
+        {
+            "ok": True,
+            "imported_count": len(imported),
+            "failed_count": len(failed),
+            "imported": imported,
+            "failed": failed,
+        }
+    )
 
 
 @app.get("/api/tasks/{task_id}/download")

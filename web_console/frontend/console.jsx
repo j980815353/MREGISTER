@@ -38,6 +38,7 @@ function normalizeStatePayload(payload) {
     schedules: payload.schedules || [],
     apiKeys: payload.apiKeys || payload.api_keys || [],
     defaults: payload.defaults || {},
+    cpamc: payload.cpamc || {},
     dashboard: payload.dashboard || {},
     platforms: payload.platforms || {},
   };
@@ -326,6 +327,7 @@ export function ConsoleApp() {
     schedules: [],
     apiKeys: [],
     defaults: {},
+    cpamc: {},
     dashboard: {},
     platforms: APP_CONFIG.platforms || {},
   });
@@ -356,6 +358,13 @@ export function ConsoleApp() {
     concurrency: '1',
     time_of_day: '',
     use_proxy: false,
+  });
+  const [cpamcDraft, setCpamcDraft] = useState({
+    enabled: false,
+    base_url: '',
+    management_key: '',
+    linked: false,
+    last_error: '',
   });
   const [apiKeyName, setApiKeyName] = useState('');
   const modalResolverRef = useRef(null);
@@ -425,6 +434,13 @@ export function ConsoleApp() {
       default_gptmail_credential_id: payload.defaults.default_gptmail_credential_id ? String(payload.defaults.default_gptmail_credential_id) : '',
       default_yescaptcha_credential_id: payload.defaults.default_yescaptcha_credential_id ? String(payload.defaults.default_yescaptcha_credential_id) : '',
       default_proxy_id: payload.defaults.default_proxy_id ? String(payload.defaults.default_proxy_id) : '',
+    });
+    setCpamcDraft({
+      enabled: Boolean(payload.cpamc?.enabled),
+      base_url: payload.cpamc?.base_url || '',
+      management_key: payload.cpamc?.management_key || '',
+      linked: Boolean(payload.cpamc?.linked),
+      last_error: payload.cpamc?.last_error || '',
     });
     setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies));
     setScheduleDraft((current) => {
@@ -596,6 +612,44 @@ export function ConsoleApp() {
     });
   }
 
+  async function handleCpamcSave(event) {
+    event.preventDefault();
+    await withBusy('cpamc-save', async () => {
+      try {
+        await api('/api/cpamc', {
+          method: 'POST',
+          body: JSON.stringify({
+            enabled: cpamcDraft.enabled,
+            base_url: cpamcDraft.base_url,
+            management_key: cpamcDraft.management_key,
+          }),
+        });
+        await refreshState();
+      } catch (error) {
+        setLoadError(error.message);
+      }
+    });
+  }
+
+  async function handleCpamcTest() {
+    await withBusy('cpamc-test', async () => {
+      try {
+        await api('/api/cpamc/test', {
+          method: 'POST',
+          body: JSON.stringify({
+            enabled: cpamcDraft.enabled,
+            base_url: cpamcDraft.base_url,
+            management_key: cpamcDraft.management_key,
+          }),
+        });
+      } catch (error) {
+        setLoadError(error.message);
+      } finally {
+        await refreshState().catch(() => {});
+      }
+    });
+  }
+
   async function handleApiKeySubmit(event) {
     event.preventDefault();
     await withBusy('api-key-save', async () => {
@@ -683,6 +737,22 @@ export function ConsoleApp() {
       await api(`/api/tasks/${task.id}`, { method: 'DELETE' });
       setSelectedTaskId(null);
       await refreshState();
+    });
+  }
+
+  async function handleImportTaskToCpamc(task) {
+    await withBusy(`cpamc-import-${task.id}`, async () => {
+      try {
+        const result = await api(`/api/tasks/${task.id}/cpamc-import`, { method: 'POST' });
+        if (result.failed_count) {
+          window.alert(tr('cpamc_import_partial', { success: result.imported_count, failed: result.failed_count }));
+        } else {
+          window.alert(tr('cpamc_import_success', { count: result.imported_count }));
+        }
+        await refreshState();
+      } catch (error) {
+        setLoadError(error.message);
+      }
     });
   }
 
@@ -1091,6 +1161,18 @@ export function ConsoleApp() {
                   <BusyButton type="button" busy={isBusy(`task-stop-${visibleTask.id}`)} disabled={!['queued', 'running', 'stopping'].includes(visibleTask.status)} onClick={() => handleStopTask(visibleTask)}>{tr('stop_task')}</BusyButton>
                   <button type="button" disabled={['queued', 'running', 'stopping'].includes(visibleTask.status)} onClick={() => window.open(`/api/tasks/${visibleTask.id}/download`, '_blank')}>{tr('download_zip')}</button>
                   <BusyButton type="button" className="danger" busy={isBusy(`task-delete-${visibleTask.id}`)} disabled={['queued', 'running', 'stopping'].includes(visibleTask.status)} onClick={() => handleDeleteTask(visibleTask)}>{tr('delete_task')}</BusyButton>
+                  {statePayload.cpamc?.enabled && statePayload.cpamc?.linked ? (
+                    <BusyButton
+                      type="button"
+                      className="ghost-btn"
+                      busy={isBusy(`cpamc-import-${visibleTask.id}`)}
+                      disabled={!visibleTask.cpamc_importable_count}
+                      title={!visibleTask.cpamc_importable_count ? tr('cpamc_import_disabled') : ''}
+                      onClick={() => handleImportTaskToCpamc(visibleTask)}
+                    >
+                      {tr('cpamc_import_button')}
+                    </BusyButton>
+                  ) : null}
                 </div>
                 <div className="console-box large-console">
                   <div className="console-title">{tr('console_title')}</div>
@@ -1110,6 +1192,9 @@ export function ConsoleApp() {
   }
 
   function renderSchedules() {
+    const cpamcStatus = cpamcDraft.enabled
+      ? (cpamcDraft.linked ? tr('cpamc_status_linked') : tr('cpamc_status_unlinked'))
+      : tr('cpamc_status_disabled');
     return (
       <section className="section-card active">
         <div className="grid-two">
@@ -1179,6 +1264,64 @@ export function ConsoleApp() {
             </div>
           </article>
         </div>
+        <article className="panel">
+          <div className="panel-head">
+            <div>
+              <h3>{tr('cpamc_title')}</h3>
+              <span>{tr('cpamc_desc')}</span>
+            </div>
+            <span className={`status-pill ${cpamcDraft.linked ? 'status-pill--completed' : 'status-pill--queued'}`.trim()}>{cpamcStatus}</span>
+          </div>
+          <form className="stack" onSubmit={handleCpamcSave}>
+            <label className="checkbox-row field-card field-card--checkbox">
+              <input
+                type="checkbox"
+                checked={cpamcDraft.enabled}
+                onChange={(event) => setCpamcDraft((current) => ({
+                  ...current,
+                  enabled: event.target.checked,
+                  linked: false,
+                  last_error: '',
+                }))}
+              />
+              <span>{tr('field_cpamc_enabled')}</span>
+            </label>
+            <label className="field-card">
+              <span>{tr('field_cpamc_base_url')}</span>
+              <input
+                required={cpamcDraft.enabled}
+                value={cpamcDraft.base_url}
+                placeholder={tr('field_cpamc_base_url_placeholder')}
+                onChange={(event) => setCpamcDraft((current) => ({
+                  ...current,
+                  base_url: event.target.value,
+                  linked: false,
+                  last_error: '',
+                }))}
+              />
+            </label>
+            <label className="field-card">
+              <span>{tr('field_cpamc_management_key')}</span>
+              <input
+                type="password"
+                required={cpamcDraft.enabled}
+                value={cpamcDraft.management_key}
+                placeholder={tr('field_cpamc_management_key_placeholder')}
+                onChange={(event) => setCpamcDraft((current) => ({
+                  ...current,
+                  management_key: event.target.value,
+                  linked: false,
+                  last_error: '',
+                }))}
+              />
+            </label>
+            {cpamcDraft.last_error ? <p className="field-tip">{tr('cpamc_last_error', { value: cpamcDraft.last_error })}</p> : null}
+            <div className="form-actions">
+              <BusyButton type="submit" className="ghost-btn" busy={isBusy('cpamc-save')}>{tr('save_cpamc')}</BusyButton>
+              <BusyButton type="button" busy={isBusy('cpamc-test')} onClick={handleCpamcTest}>{tr('test_cpamc')}</BusyButton>
+            </div>
+          </form>
+        </article>
       </section>
     );
   }
