@@ -603,6 +603,16 @@ class OAuthClient:
         import json
         import base64
         
+        def _decode_segment(raw):
+            if not raw:
+                return None
+            try:
+                padded = raw + "=" * ((4 - len(raw) % 4) % 4)
+                decoded = base64.urlsafe_b64decode(padded).decode("utf-8")
+                return json.loads(decoded)
+            except Exception:
+                return None
+
         try:
             for cookie in self.session.cookies:
                 try:
@@ -610,10 +620,17 @@ class OAuthClient:
                     if name == "oai-client-auth-session":
                         value = cookie.value if hasattr(cookie, 'value') else self.session.cookies.get(name)
                         if value:
-                            # 解码 base64
-                            decoded = base64.b64decode(value).decode('utf-8')
-                            data = json.loads(decoded)
-                            return data
+                            # 新格式通常是 JWT-like 结构，workspace 信息在第一段
+                            if "." in value:
+                                first_segment = value.split(".", 1)[0]
+                                data = _decode_segment(first_segment)
+                                if data:
+                                    return data
+
+                            # 兼容旧格式：整个 cookie 直接是 base64/json
+                            data = _decode_segment(value)
+                            if data:
+                                return data
                 except Exception:
                     continue
         except Exception:
