@@ -1364,6 +1364,7 @@ class TaskSupervisor:
         results_count = count_result_lines(row)
         quantity = int(row["quantity"])
         current_status = row["status"]
+        exit_error = None if exit_code == 0 else f"Task exited with code {exit_code}."
         if results_count >= quantity:
             status = "completed"
             error = None
@@ -1372,10 +1373,10 @@ class TaskSupervisor:
             error = row["last_error"] or "Task stopped by operator."
         elif results_count > 0:
             status = "partial"
-            error = f"Task finished with {results_count}/{quantity} successful results."
+            error = row["last_error"] or exit_error or f"Task finished with {results_count}/{quantity} successful results."
         else:
             status = "failed"
-            error = row["last_error"] or "Task finished without successful results."
+            error = row["last_error"] or exit_error or "Task finished without successful results."
         execute_no_return(
             """
             UPDATE tasks
